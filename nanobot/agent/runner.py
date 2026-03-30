@@ -60,7 +60,7 @@ class AgentRunner:
         messages = list(spec.initial_messages)
         final_content: str | None = None
         tools_used: list[str] = []
-        usage = {"prompt_tokens": 0, "completion_tokens": 0}
+        usage = {"prompt_tokens": 0, "completion_tokens": 0, "cached_tokens": 0}
         error: str | None = None
         stop_reason = "completed"
         tool_events: list[dict[str, str]] = []
@@ -92,12 +92,20 @@ class AgentRunner:
                 response = await self.provider.chat_with_retry(**kwargs)
 
             raw_usage = response.usage or {}
-            usage = {
+            iter_usage = {
                 "prompt_tokens": int(raw_usage.get("prompt_tokens", 0) or 0),
                 "completion_tokens": int(raw_usage.get("completion_tokens", 0) or 0),
             }
+            # Pass through cached_tokens if present.
+            cached = raw_usage.get("cached_tokens")
+            if cached:
+                iter_usage["cached_tokens"] = int(cached)
+            usage["prompt_tokens"] += iter_usage["prompt_tokens"]
+            usage["completion_tokens"] += iter_usage["completion_tokens"]
+            if "cached_tokens" in iter_usage:
+                usage["cached_tokens"] = usage.get("cached_tokens", 0) + iter_usage["cached_tokens"]
             context.response = response
-            context.usage = usage
+            context.usage = iter_usage
             context.tool_calls = list(response.tool_calls)
 
             if response.has_tool_calls:
