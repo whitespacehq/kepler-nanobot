@@ -560,7 +560,8 @@ Uses **WebSocket** long connection — no public IP required.
       "groupPolicy": "mention",
       "reactEmoji": "OnIt",
       "doneEmoji": "DONE",
-      "streaming": true
+      "streaming": true,
+      "domain": "feishu"
     }
   }
 }
@@ -572,6 +573,7 @@ Uses **WebSocket** long connection — no public IP required.
 > `groupPolicy`: `"mention"` (default — respond only when @mentioned), `"open"` (respond to all group messages). Private chats always respond.
 > `reactEmoji`: Emoji for "processing" status (default: `OnIt`). See [available emojis](https://open.larkoffice.com/document/server-docs/im-v1/message-reaction/emojis-introduce).
 > `doneEmoji`: Optional emoji for "completed" status (e.g., `DONE`, `OK`, `HEART`). When set, bot adds this reaction after removing `reactEmoji`.
+> `domain`: `"feishu"` (default) for China (open.feishu.cn), `"lark"` for international Lark (open.larksuite.com).
 
 **3. Run**
 
