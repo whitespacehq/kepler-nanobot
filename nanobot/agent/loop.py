@@ -179,6 +179,7 @@ class AgentLoop:
         mcp_servers: dict | None = None,
         channels_config: ChannelsConfig | None = None,
         timezone: str | None = None,
+        session_ttl_minutes: int = 0,
         hooks: list[AgentHook] | None = None,
     ):
         from nanobot.config.schema import ExecToolConfig, WebToolsConfig
@@ -208,6 +209,7 @@ class AgentLoop:
         self.exec_config = exec_config or ExecToolConfig()
         self.cron_service = cron_service
         self.restrict_to_workspace = restrict_to_workspace
+        self._session_ttl_minutes = session_ttl_minutes
         self._start_time = time.time()
         self._last_usage: dict[str, int] = {}
         self._extra_hooks: list[AgentHook] = hooks or []
