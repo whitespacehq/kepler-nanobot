@@ -19,7 +19,7 @@ class AutoSessionNew:
         self.consolidator = consolidator
         self._ttl = session_ttl_minutes
         self._archiving: set[str] = set()
-        self._summaries: dict[str, str] = {}
+        self._summaries: dict[str, tuple[str, datetime]] = {}
 
     def _is_expired(self, ts: datetime | str | None) -> bool:
         if self._ttl <= 0 or not ts:
@@ -47,15 +47,12 @@ class AutoSessionNew:
                 self.sessions.save(session)
                 return
             n = len(msgs)
-            idle_min = int((datetime.now() - session.updated_at).total_seconds() / 60)
+            last_active = session.updated_at
             await self.consolidator.archive(msgs)
             entry = self.consolidator.store._read_last_entry()
             summary = (entry or {}).get("content", "")
             if summary and summary != "(nothing)":
-                self._summaries[key] = (
-                    f"Inactive for {idle_min} minutes.\n"
-                    f"Previous conversation summary: {summary}"
-                )
+                self._summaries[key] = (summary, last_active)
             session.clear()
             self.sessions.save(session)
             logger.info("Auto-new: archived {} ({} messages, summary={})", key, n, bool(summary))
@@ -68,4 +65,10 @@ class AutoSessionNew:
         if key in self._archiving or self._is_expired(session.updated_at):
             logger.info("Auto-new: reloading session {} (archiving={})", key, key in self._archiving)
             session = self.sessions.get_or_create(key)
-        return session, self._summaries.pop(key, None)
+        entry = self._summaries.pop(key, None)
+        summary = None
+        if entry:
+            text, last_active = entry
+            idle_min = int((datetime.now() - last_active).total_seconds() / 60)
+            summary = f"Inactive for {idle_min} minutes.\nPrevious conversation summary: {text}"
+        return session, summary
