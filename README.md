@@ -1515,7 +1515,7 @@ When a user is idle for longer than a configured TTL, nanobot **proactively** ar
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `agents.defaults.sessionTtlMinutes` | `0` (disabled) | Minutes of idle time before auto-archival. Set to `0` to disable. |
+| `agents.defaults.sessionTtlMinutes` | `0` (disabled) | Minutes of idle time before auto-archival. Set to `0` to disable. Recommended: `15` — matches typical LLM KV cache expiration, so archived sessions won't waste cache on cold entries. |
 
 How it works:
 1. **Idle detection**: On each idle tick (~1 s), checks all sessions for expiration.
