@@ -516,16 +516,22 @@ class TestAutoNewIntegration:
 class TestProactiveAutoNew:
     """Test proactive auto-new on idle ticks (TimeoutError path in run loop)."""
 
+    @staticmethod
+    async def _run_check_expired(loop):
+        """Helper: run check_expired via callback and wait for background tasks."""
+        loop.auto_new.check_expired(loop._schedule_background)
+        await asyncio.sleep(0.1)
+
     @pytest.mark.asyncio
     async def test_no_check_when_ttl_disabled(self, tmp_path):
-        """_check_expired_sessions should be a no-op when TTL is 0."""
+        """check_expired should be a no-op when TTL is 0."""
         loop = _make_loop(tmp_path, session_ttl_minutes=0)
         session = loop.sessions.get_or_create("cli:test")
         session.add_message("user", "old message")
         session.updated_at = datetime.now() - timedelta(minutes=30)
         loop.sessions.save(session)
 
-        await loop.auto_new.check_expired(loop._schedule_background)
+        await self._run_check_expired(loop)
 
         session_after = loop.sessions.get_or_create("cli:test")
         assert len(session_after.messages) == 1
@@ -552,9 +558,7 @@ class TestProactiveAutoNew:
             {"cursor": 1, "timestamp": "2026-01-01 00:00", "content": "User chatted about old things."},
         ]
 
-        await loop.auto_new.check_expired(loop._schedule_background)
-        # Background task needs a tick to complete
-        await asyncio.sleep(0.1)
+        await self._run_check_expired(loop)
 
         session_after = loop.sessions.get_or_create("cli:test")
         assert len(session_after.messages) == 0
@@ -570,8 +574,7 @@ class TestProactiveAutoNew:
         session.add_message("user", "recent message")
         loop.sessions.save(session)
 
-        await loop.auto_new.check_expired(loop._schedule_background)
-        await asyncio.sleep(0.1)
+        await self._run_check_expired(loop)
 
         session_after = loop.sessions.get_or_create("cli:test")
         assert len(session_after.messages) == 1
@@ -597,13 +600,13 @@ class TestProactiveAutoNew:
 
         loop.consolidator.archive = _slow_archive
 
-        # First call starts archiving
-        await loop.auto_new.check_expired(loop._schedule_background)
+        # First call starts archiving via callback
+        loop.auto_new.check_expired(loop._schedule_background)
         await asyncio.sleep(0.05)
         assert archive_count == 1
 
         # Second call should skip (key is in _archiving_keys)
-        await loop.auto_new.check_expired(loop._schedule_background)
+        loop.auto_new.check_expired(loop._schedule_background)
         await asyncio.sleep(0.05)
         assert archive_count == 1
 
@@ -627,8 +630,7 @@ class TestProactiveAutoNew:
         loop.consolidator.archive = _failing_archive
 
         # Should not raise
-        await loop.auto_new.check_expired(loop._schedule_background)
-        await asyncio.sleep(0.1)
+        await self._run_check_expired(loop)
 
         # Key should be removed from _archiving_keys (finally block)
         assert "cli:test" not in loop.auto_new._archiving_keys
@@ -651,8 +653,7 @@ class TestProactiveAutoNew:
 
         loop.consolidator.archive = _fake_archive
 
-        await loop.auto_new.check_expired(loop._schedule_background)
-        await asyncio.sleep(0.1)
+        await self._run_check_expired(loop)
 
         assert not archive_called
         await loop.close_mcp()

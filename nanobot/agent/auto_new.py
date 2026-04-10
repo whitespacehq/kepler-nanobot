@@ -40,7 +40,7 @@ class AutoSessionNew:
         elapsed_s = (datetime.now() - updated_at).total_seconds()
         return elapsed_s >= self._session_ttl_minutes * 60
 
-    async def check_expired(self, schedule_background: Callable[[Coroutine], None]) -> None:
+    def check_expired(self, schedule_background: Callable[[Coroutine], None]) -> None:
         """Scan all sessions and schedule background archival for expired ones."""
         for info in self.sessions.list_sessions():
             key = info.get("key", "")
@@ -66,7 +66,11 @@ class AutoSessionNew:
 
         Returns the summary text (or None).
         """
+        # Invalidate cache and reload from disk to avoid mutating a session object
+        # that _process_message may be actively using concurrently.
+        self.sessions.invalidate(session_key)
         session = self.sessions.get_or_create(session_key)
+
         unconsolidated = session.messages[session.last_consolidated:]
         if not unconsolidated:
             return None
