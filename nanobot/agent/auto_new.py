@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Any, Callable, Coroutine
+from typing import TYPE_CHECKING, Callable, Coroutine
 
 from loguru import logger
 
@@ -13,90 +13,48 @@ if TYPE_CHECKING:
 
 
 class AutoSessionNew:
-    """Manages proactive archival of idle sessions.
-
-    Monitors session idle time and archives expired sessions in the
-    background so that the user experiences zero latency when returning.
-    """
-
-    def __init__(
-        self,
-        sessions: SessionManager,
-        consolidator: Consolidator,
-        session_ttl_minutes: int = 0,
-    ):
+    def __init__(self, sessions: SessionManager, consolidator: Consolidator,
+                 session_ttl_minutes: int = 0):
         self.sessions = sessions
         self.consolidator = consolidator
-        self._session_ttl_minutes = session_ttl_minutes
-        self._archiving_keys: set[str] = set()
-        self._pending_summaries: dict[str, str] = {}
+        self._ttl = session_ttl_minutes
+        self._archiving: set[str] = set()
+        self._summaries: dict[str, str] = {}
 
-    def is_expired(self, updated_at: datetime | str | None) -> bool:
-        """Check whether an updated_at timestamp is beyond the TTL."""
-        if self._session_ttl_minutes <= 0 or not updated_at:
+    def _is_expired(self, ts: datetime | str | None) -> bool:
+        if self._ttl <= 0 or not ts:
             return False
-        if isinstance(updated_at, str):
-            updated_at = datetime.fromisoformat(updated_at)
-        elapsed_s = (datetime.now() - updated_at).total_seconds()
-        return elapsed_s >= self._session_ttl_minutes * 60
+        if isinstance(ts, str):
+            ts = datetime.fromisoformat(ts)
+        return (datetime.now() - ts).total_seconds() >= self._ttl * 60
 
     def check_expired(self, schedule_background: Callable[[Coroutine], None]) -> None:
-        """Scan all sessions and schedule background archival for expired ones."""
-        if self._session_ttl_minutes <= 0:
-            return
         for info in self.sessions.list_sessions():
             key = info.get("key", "")
-            if not key or key in self._archiving_keys:
-                continue
-            if self.is_expired(info.get("updated_at")):
-                self._archiving_keys.add(key)
-                schedule_background(self._archive_and_store(key))
+            if key and key not in self._archiving and self._is_expired(info.get("updated_at")):
+                self._archiving.add(key)
+                schedule_background(self._archive(key))
 
-    async def _archive_and_store(self, session_key: str) -> None:
-        """Archive an expired session in the background, store summary for next message."""
+    async def _archive(self, key: str) -> None:
         try:
-            summary = await self.archive_and_clear(session_key)
-            if summary:
-                self._pending_summaries[session_key] = summary
+            self.sessions.invalidate(key)
+            session = self.sessions.get_or_create(key)
+            msgs = session.messages[session.last_consolidated:]
+            if not msgs:
+                return
+            await self.consolidator.archive(msgs)
+            entry = self.consolidator.store._read_last_entry()
+            summary = (entry or {}).get("content", "")
+            if summary and summary != "(nothing)":
+                self._summaries[key] = summary
+            session.clear()
+            self.sessions.save(session)
         except Exception:
-            logger.exception("Proactive auto-new failed for {}", session_key)
+            logger.exception("Auto-new failed for {}", key)
         finally:
-            self._archiving_keys.discard(session_key)
+            self._archiving.discard(key)
 
-    async def archive_and_clear(self, session_key: str) -> str | None:
-        """Archive un-consolidated messages and clear session.
-
-        Returns the summary text (or None).
-        """
-        # Invalidate cache and reload from disk to avoid mutating a session object
-        # that _process_message may be actively using concurrently.
-        self.sessions.invalidate(session_key)
-        session = self.sessions.get_or_create(session_key)
-
-        unconsolidated = session.messages[session.last_consolidated:]
-        if not unconsolidated:
-            return None
-
-        logger.info("Auto session new for {} (idle {} min)", session_key, self._session_ttl_minutes)
-
-        await self.consolidator.archive(unconsolidated)
-
-        last_entry: dict[str, Any] | None = self.consolidator.store._read_last_entry()
-        summary_text = last_entry["content"] if last_entry else ""
-        if not summary_text or summary_text == "(nothing)":
-            summary_text = ""
-
-        session.clear()
-        self.sessions.save(session)
-        self.sessions.invalidate(session_key)
-
-        return summary_text or None
-
-    def prepare_session(self, session: Session, session_key: str) -> tuple[Session, str | None]:
-        """Reload session if needed and consume pending summary.
-
-        Returns the (possibly reloaded) session and the one-shot summary.
-        """
-        if session_key in self._archiving_keys or self.is_expired(session.updated_at):
-            session = self.sessions.get_or_create(session_key)
-        return session, self._pending_summaries.pop(session_key, None)
+    def prepare_session(self, session: Session, key: str) -> tuple[Session, str | None]:
+        if key in self._archiving or self._is_expired(session.updated_at):
+            session = self.sessions.get_or_create(key)
+        return session, self._summaries.pop(key, None)
