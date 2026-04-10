@@ -19,7 +19,6 @@ class AutoCompact:
         self.consolidator = consolidator
         self._ttl = session_ttl_minutes
         self._archiving: set[str] = set()
-        self._archived: set[str] = set()
         self._summaries: dict[str, tuple[str, datetime]] = {}
 
     def _is_expired(self, ts: datetime | str | None) -> bool:
@@ -37,7 +36,7 @@ class AutoCompact:
     def check_expired(self, schedule_background: Callable[[Coroutine], None]) -> None:
         for info in self.sessions.list_sessions():
             key = info.get("key", "")
-            if key and key not in self._archiving and key not in self._archived and self._is_expired(info.get("updated_at")):
+            if key and key not in self._archiving and self._is_expired(info.get("updated_at")):
                 self._archiving.add(key)
                 logger.debug("Auto-compact: scheduling archival for {} (idle > {} min)", key, self._ttl)
                 schedule_background(self._archive(key))
@@ -49,7 +48,6 @@ class AutoCompact:
             msgs = session.messages[session.last_consolidated:]
             if not msgs:
                 logger.debug("Auto-compact: skipping {}, no un-consolidated messages", key)
-                self._archived.add(key)
                 session.updated_at = datetime.now()
                 self.sessions.save(session)
                 return
@@ -62,7 +60,6 @@ class AutoCompact:
                 self._summaries[key] = (summary, last_active)
                 session.metadata["_last_summary"] = {"text": summary, "last_active": last_active.isoformat()}
             session.clear()
-            self._archived.add(key)
             self.sessions.save(session)
             logger.info("Auto-compact: archived {} ({} messages, summary={})", key, n, bool(summary))
         except Exception:
@@ -71,7 +68,6 @@ class AutoCompact:
             self._archiving.discard(key)
 
     def prepare_session(self, session: Session, key: str) -> tuple[Session, str | None]:
-        self._archived.discard(key)
         if key in self._archiving or self._is_expired(session.updated_at):
             logger.info("Auto-compact: reloading session {} (archiving={})", key, key in self._archiving)
             session = self.sessions.get_or_create(key)

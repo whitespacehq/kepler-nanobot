@@ -722,16 +722,15 @@ class TestProactiveAutoCompact:
         # First tick: archives the session
         await self._run_check_expired(loop)
         assert archive_count == 1
-        assert "cli:test" in loop.auto_compact._archived
 
-        # Second tick: should NOT re-schedule (already archived)
+        # Second tick: should NOT re-schedule (updated_at is fresh after clear)
         await self._run_check_expired(loop)
         assert archive_count == 1  # Still 1, not re-scheduled
         await loop.close_mcp()
 
     @pytest.mark.asyncio
-    async def test_no_reschedule_after_empty_session_skip(self, tmp_path):
-        """Empty session skip should also prevent re-scheduling."""
+    async def test_empty_skip_refreshes_updated_at_prevents_reschedule(self, tmp_path):
+        """Empty session skip refreshes updated_at, preventing immediate re-scheduling."""
         loop = _make_loop(tmp_path, session_ttl_minutes=15)
         session = loop.sessions.get_or_create("cli:test")
         session.updated_at = datetime.now() - timedelta(minutes=20)
@@ -746,26 +745,30 @@ class TestProactiveAutoCompact:
 
         loop.consolidator.archive = _fake_archive
 
-        # First tick: skips (no messages)
+        # First tick: skips (no messages), refreshes updated_at
         await self._run_check_expired(loop)
         assert archive_count == 0
-        assert "cli:test" in loop.auto_compact._archived
 
-        # Second tick: should NOT re-schedule
+        # Second tick: should NOT re-schedule because updated_at is fresh
         await self._run_check_expired(loop)
         assert archive_count == 0
         await loop.close_mcp()
 
     @pytest.mark.asyncio
-    async def test_archived_cleared_on_new_message(self, tmp_path):
-        """_archived flag should be cleared when user sends a new message."""
+    async def test_session_can_be_compacted_again_after_new_messages(self, tmp_path):
+        """After successful compact + user sends new messages + idle again, should compact again."""
         loop = _make_loop(tmp_path, session_ttl_minutes=15)
         session = loop.sessions.get_or_create("cli:test")
-        session.add_message("user", "old message")
+        session.add_message("user", "first conversation")
+        session.add_message("assistant", "first response")
         session.updated_at = datetime.now() - timedelta(minutes=20)
         loop.sessions.save(session)
 
+        archive_count = 0
+
         async def _fake_archive(messages):
+            nonlocal archive_count
+            archive_count += 1
             return True
 
         loop.consolidator.archive = _fake_archive
@@ -773,15 +776,23 @@ class TestProactiveAutoCompact:
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
         }
 
-        # Archive completes
+        # First compact cycle
         await loop.auto_compact._archive("cli:test")
-        assert "cli:test" in loop.auto_compact._archived
+        assert archive_count == 1
 
-        # User sends a new message — prepare_session clears _archived
-        msg = InboundMessage(channel="cli", sender_id="user", chat_id="test", content="new msg")
+        # User returns, sends new messages
+        msg = InboundMessage(channel="cli", sender_id="user", chat_id="test", content="second topic")
         await loop._process_message(msg)
 
-        assert "cli:test" not in loop.auto_compact._archived
+        # Simulate idle again
+        loop.sessions.invalidate("cli:test")
+        session2 = loop.sessions.get_or_create("cli:test")
+        session2.updated_at = datetime.now() - timedelta(minutes=20)
+        loop.sessions.save(session2)
+
+        # Second compact cycle should succeed
+        await loop.auto_compact._archive("cli:test")
+        assert archive_count == 2
         await loop.close_mcp()
 
 
@@ -840,7 +851,6 @@ class TestSummaryPersistence:
 
         # Simulate restart: clear in-memory state
         loop.auto_compact._summaries.clear()
-        loop.auto_compact._archived.clear()
         loop.sessions.invalidate("cli:test")
 
         # prepare_session should recover summary from metadata
