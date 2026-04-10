@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import TYPE_CHECKING, Callable, Coroutine
+from typing import TYPE_CHECKING, Any, Callable, Coroutine
 
 from loguru import logger
 
@@ -42,6 +42,8 @@ class AutoSessionNew:
 
     def check_expired(self, schedule_background: Callable[[Coroutine], None]) -> None:
         """Scan all sessions and schedule background archival for expired ones."""
+        if self._session_ttl_minutes <= 0:
+            return
         for info in self.sessions.list_sessions():
             key = info.get("key", "")
             if not key or key in self._archiving_keys:
@@ -79,8 +81,8 @@ class AutoSessionNew:
 
         await self.consolidator.archive(unconsolidated)
 
-        entries = self.consolidator.store.read_unprocessed_history(since_cursor=0)
-        summary_text = entries[-1]["content"] if entries else ""
+        last_entry: dict[str, Any] | None = self.consolidator.store._read_last_entry()
+        summary_text = last_entry["content"] if last_entry else ""
         if not summary_text or summary_text == "(nothing)":
             summary_text = ""
 
@@ -90,10 +92,11 @@ class AutoSessionNew:
 
         return summary_text or None
 
-    def needs_reload(self, session: Session, session_key: str) -> bool:
-        """Check if session should be reloaded (archived or expired)."""
-        return session_key in self._archiving_keys or self.is_expired(session.updated_at)
+    def prepare_session(self, session: Session, session_key: str) -> tuple[Session, str | None]:
+        """Reload session if needed and consume pending summary.
 
-    def pop_summary(self, session_key: str) -> str | None:
-        """Pop and return the pending summary for a session (one-shot)."""
-        return self._pending_summaries.pop(session_key, None)
+        Returns the (possibly reloaded) session and the one-shot summary.
+        """
+        if session_key in self._archiving_keys or self.is_expired(session.updated_at):
+            session = self.sessions.get_or_create(session_key)
+        return session, self._pending_summaries.pop(session_key, None)

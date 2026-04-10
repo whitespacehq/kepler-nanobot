@@ -534,17 +534,12 @@ class AgentLoop:
             if self._restore_runtime_checkpoint(session):
                 self.sessions.save(session)
 
-            # Reload session (proactive auto-new may have cleared it)
-            if self.auto_new.needs_reload(session, key):
-                session = self.sessions.get_or_create(key)
+            session, pending = self.auto_new.prepare_session(session, key)
 
             await self.consolidator.maybe_consolidate_by_tokens(session)
             self._set_tool_context(channel, chat_id, msg.metadata.get("message_id"))
             history = session.get_history(max_messages=0)
             current_role = "assistant" if msg.sender_id == "subagent" else "user"
-
-            # Inject resumed-session summary as ephemeral runtime context
-            pending = self.auto_new.pop_summary(key)
 
             messages = self.context.build_messages(
                 history=history,
@@ -571,9 +566,7 @@ class AgentLoop:
         if self._restore_runtime_checkpoint(session):
             self.sessions.save(session)
 
-        # Reload session (proactive auto-new may have cleared it)
-        if self.auto_new.needs_reload(session, key):
-            session = self.sessions.get_or_create(key)
+        session, pending = self.auto_new.prepare_session(session, key)
 
         # Slash commands
         raw = msg.content.strip()
@@ -589,9 +582,6 @@ class AgentLoop:
                 message_tool.start_turn()
 
         history = session.get_history(max_messages=0)
-
-        # Inject resumed-session summary as ephemeral runtime context (one-shot, not persisted)
-        pending = self.auto_new.pop_summary(key)
 
         initial_messages = self.context.build_messages(
             history=history,

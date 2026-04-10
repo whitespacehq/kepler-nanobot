@@ -108,9 +108,9 @@ class TestAutoNew:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store.read_unprocessed_history = lambda since_cursor=0: [
-            {"cursor": 1, "timestamp": "2026-01-01 00:00", "content": "User said hello, assistant said hi there."},
-        ]
+        loop.consolidator.store._read_last_entry = lambda: {
+            "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "User said hello, assistant said hi there.",
+        }
 
         result = await loop.auto_new.archive_and_clear("cli:test")
 
@@ -203,9 +203,9 @@ class TestAutoNewIdleDetection:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store.read_unprocessed_history = lambda since_cursor=0: [
-            {"cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary."},
-        ]
+        loop.consolidator.store._read_last_entry = lambda: {
+            "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
+        }
 
         # Simulate proactive archive completing before message arrives
         summary = await loop.auto_new.archive_and_clear("cli:test")
@@ -302,9 +302,9 @@ class TestAutoNewSystemMessages:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store.read_unprocessed_history = lambda since_cursor=0: [
-            {"cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary."},
-        ]
+        loop.consolidator.store._read_last_entry = lambda: {
+            "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
+        }
 
         # Simulate proactive archive completing before system message arrives
         summary = await loop.auto_new.archive_and_clear("cli:test")
@@ -392,9 +392,9 @@ class TestAutoNewEdgeCases:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store.read_unprocessed_history = lambda since_cursor=0: [
-            {"cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary."},
-        ]
+        loop.consolidator.store._read_last_entry = lambda: {
+            "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
+        }
 
         # Simulate proactive archive completing before message arrives
         summary = await loop.auto_new.archive_and_clear("cli:test")
@@ -484,9 +484,9 @@ class TestAutoNewIntegration:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store.read_unprocessed_history = lambda since_cursor=0: [
-            {"cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary."},
-        ]
+        loop.consolidator.store._read_last_entry = lambda: {
+            "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
+        }
 
         # Simulate proactive archive completing before message arrives
         summary = await loop.auto_new.archive_and_clear("cli:test")
@@ -554,9 +554,9 @@ class TestProactiveAutoNew:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store.read_unprocessed_history = lambda since_cursor=0: [
-            {"cursor": 1, "timestamp": "2026-01-01 00:00", "content": "User chatted about old things."},
-        ]
+        loop.consolidator.store._read_last_entry = lambda: {
+            "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "User chatted about old things.",
+        }
 
         await self._run_check_expired(loop)
 
