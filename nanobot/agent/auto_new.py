@@ -33,6 +33,7 @@ class AutoSessionNew:
             key = info.get("key", "")
             if key and key not in self._archiving and self._is_expired(info.get("updated_at")):
                 self._archiving.add(key)
+                logger.info("Auto-new: scheduling archival for {} (idle > {} min)", key, self._ttl)
                 schedule_background(self._archive(key))
 
     async def _archive(self, key: str) -> None:
@@ -41,7 +42,9 @@ class AutoSessionNew:
             session = self.sessions.get_or_create(key)
             msgs = session.messages[session.last_consolidated:]
             if not msgs:
+                logger.debug("Auto-new: skipping {}, no un-consolidated messages", key)
                 return
+            n = len(msgs)
             await self.consolidator.archive(msgs)
             entry = self.consolidator.store._read_last_entry()
             summary = (entry or {}).get("content", "")
@@ -49,12 +52,14 @@ class AutoSessionNew:
                 self._summaries[key] = summary
             session.clear()
             self.sessions.save(session)
+            logger.info("Auto-new: archived {} ({} messages, summary={})", key, n, bool(summary))
         except Exception:
-            logger.exception("Auto-new failed for {}", key)
+            logger.exception("Auto-new: failed for {}", key)
         finally:
             self._archiving.discard(key)
 
     def prepare_session(self, session: Session, key: str) -> tuple[Session, str | None]:
         if key in self._archiving or self._is_expired(session.updated_at):
+            logger.info("Auto-new: reloading session {} (archiving={})", key, key in self._archiving)
             session = self.sessions.get_or_create(key)
         return session, self._summaries.pop(key, None)
