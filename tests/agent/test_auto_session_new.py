@@ -108,7 +108,7 @@ class TestAutoNew:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "User said hello.",
         }
 
@@ -204,7 +204,7 @@ class TestAutoNewIdleDetection:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
         }
 
@@ -301,7 +301,7 @@ class TestAutoNewSystemMessages:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
         }
 
@@ -389,7 +389,7 @@ class TestAutoNewEdgeCases:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
         }
 
@@ -479,7 +479,7 @@ class TestAutoNewIntegration:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
         }
 
@@ -547,7 +547,7 @@ class TestProactiveAutoNew:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "User chatted about old things.",
         }
 
@@ -671,7 +671,7 @@ class TestProactiveAutoNew:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
         }
 
@@ -725,7 +725,7 @@ class TestProactiveAutoNew:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
         }
 
@@ -758,7 +758,7 @@ class TestSummaryPersistence:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "User said hello.",
         }
 
@@ -787,7 +787,7 @@ class TestSummaryPersistence:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "User said hello.",
         }
 
@@ -823,7 +823,7 @@ class TestSummaryPersistence:
             return True
 
         loop.consolidator.archive = _fake_archive
-        loop.consolidator.store._read_last_entry = lambda: {
+        loop.consolidator.get_last_history_entry = lambda: {
             "cursor": 1, "timestamp": "2026-01-01 00:00", "content": "Summary.",
         }
 

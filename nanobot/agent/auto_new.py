@@ -29,6 +29,11 @@ class AutoSessionNew:
             ts = datetime.fromisoformat(ts)
         return (datetime.now() - ts).total_seconds() >= self._ttl * 60
 
+    @staticmethod
+    def _format_summary(text: str, last_active: datetime) -> str:
+        idle_min = int((datetime.now() - last_active).total_seconds() / 60)
+        return f"Inactive for {idle_min} minutes.\nPrevious conversation summary: {text}"
+
     def check_expired(self, schedule_background: Callable[[Coroutine], None]) -> None:
         for info in self.sessions.list_sessions():
             key = info.get("key", "")
@@ -51,7 +56,7 @@ class AutoSessionNew:
             n = len(msgs)
             last_active = session.updated_at
             await self.consolidator.archive(msgs)
-            entry = self.consolidator.store._read_last_entry()
+            entry = self.consolidator.get_last_history_entry()
             summary = (entry or {}).get("content", "")
             if summary and summary != "(nothing)":
                 self._summaries[key] = (summary, last_active)
@@ -71,17 +76,10 @@ class AutoSessionNew:
             logger.info("Auto-new: reloading session {} (archiving={})", key, key in self._archiving)
             session = self.sessions.get_or_create(key)
         entry = self._summaries.pop(key, None)
-        summary = None
         if entry:
-            text, last_active = entry
-            idle_min = int((datetime.now() - last_active).total_seconds() / 60)
-            summary = f"Inactive for {idle_min} minutes.\nPrevious conversation summary: {text}"
-        elif not session.messages and "_last_summary" in session.metadata:
+            return session, self._format_summary(entry[0], entry[1])
+        if not session.messages and "_last_summary" in session.metadata:
             meta = session.metadata.pop("_last_summary")
-            text = meta["text"]
-            last_active = datetime.fromisoformat(meta["last_active"])
-            idle_min = int((datetime.now() - last_active).total_seconds() / 60)
-            summary = f"Inactive for {idle_min} minutes.\nPrevious conversation summary: {text}"
-            session.metadata.pop("_last_summary", None)
             self.sessions.save(session)
-        return session, summary
+            return session, self._format_summary(meta["text"], datetime.fromisoformat(meta["last_active"]))
+        return session, None
