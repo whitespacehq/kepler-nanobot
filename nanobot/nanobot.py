@@ -85,6 +85,13 @@ class Nanobot:
             disabled_skills=defaults.disabled_skills,
             session_ttl_minutes=defaults.session_ttl_minutes,
         )
+
+        # KEPLER: register Kepler-specific tools
+        from nanobot.kepler.tools.loader import load_kepler_tools
+
+        for tool in load_kepler_tools(bus=bus):
+            loop.tools.register(tool)
+
         return cls(loop)
 
     async def run(

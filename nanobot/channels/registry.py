@@ -54,8 +54,10 @@ def discover_plugins() -> dict[str, type[BaseChannel]]:
 def discover_all() -> dict[str, type[BaseChannel]]:
     """Return all channels: built-in (pkgutil) merged with external (entry_points).
 
-    Built-in channels take priority — an external plugin cannot shadow a built-in name.
+    External plugins take priority so forks can override built-in channels
+    without modifying upstream source files.
     """
+    # KEPLER: flipped priority so entry_points override built-ins.
     builtin: dict[str, type[BaseChannel]] = {}
     for modname in discover_channel_names():
         try:
@@ -64,8 +66,8 @@ def discover_all() -> dict[str, type[BaseChannel]]:
             logger.debug("Skipping built-in channel '{}': {}", modname, e)
 
     external = discover_plugins()
-    shadowed = set(external) & set(builtin)
-    if shadowed:
-        logger.warning("Plugin(s) shadowed by built-in channels (ignored): {}", shadowed)
+    overridden = set(external) & set(builtin)
+    if overridden:
+        logger.info("Plugin(s) overriding built-in channels: {}", overridden)
 
-    return {**external, **builtin}
+    return {**builtin, **external}

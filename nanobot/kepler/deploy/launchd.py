@@ -2,12 +2,10 @@
 
 from __future__ import annotations
 
-import os
 import plistlib
 import subprocess
 import sys
 from pathlib import Path
-
 
 LABEL = "com.whitespace.kepler-nanobot"
 PLIST_NAME = f"{LABEL}.plist"

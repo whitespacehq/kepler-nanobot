@@ -91,6 +91,10 @@ dev = [
 [project.scripts]
 nanobot = "nanobot.cli.commands:app"
 
+# KEPLER: override built-in Slack channel with reaction support
+[project.entry-points."nanobot.channels"]
+slack = "nanobot.kepler.channels.slack:KeplerSlackChannel"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

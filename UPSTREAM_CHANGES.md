@@ -24,11 +24,31 @@ Files modified from upstream NanoBot that will need attention during merges. Eac
 - **PR:** —
 
 ### `nanobot/nanobot.py`
-- **What:** Added `auth_token=None` to `AnthropicProvider()` instantiation
-- **Why:** Explicit parameter threading for OAuth (resolved from env inside provider)
+- **What:** Added `auth_token=None` to `AnthropicProvider()` instantiation; added Kepler tool loader call
+- **Why:** OAuth param threading + Kepler tool auto-registration after AgentLoop init
 - **PR:** —
 
 ### `nanobot/cli/commands.py`
-- **What:** Added `auth_token=None` to `AnthropicProvider()` instantiation; added dotenv loading in `_load_runtime_config`
-- **Why:** OAuth param threading + `.env` auto-loading so secrets stay out of config.json
+- **What:** Added `auth_token=None` to `AnthropicProvider()` instantiation; added dotenv loading in `_load_runtime_config`; added `_register_kepler_tools()` helper called after each AgentLoop instantiation (3 sites)
+- **Why:** OAuth param threading + `.env` auto-loading + Kepler tool auto-registration
+- **PR:** —
+
+### `nanobot/channels/registry.py`
+- **What:** Flipped plugin/built-in priority in `discover_all()` — plugins now override built-ins
+- **Why:** Allows `KeplerSlackChannel` to replace built-in `SlackChannel` via entry_points without modifying slack.py
+- **PR:** — (arguably upstream-friendly: plugins should be able to override built-ins)
+
+### `nanobot/agent/loop.py`
+- **What:** Made `_set_tool_context()` iterate all tools with `set_context` instead of a hardcoded list
+- **Why:** Kepler tools (e.g. `slack_react`) need context routing without adding to the fixed name list each time
+- **PR:** — (generic improvement, could upstream)
+
+### `nanobot/agent/tools/registry.py`
+- **What:** Added `all_tools()` method returning `(name, tool)` pairs
+- **Why:** Needed by `_set_tool_context()` to iterate all registered tools generically
+- **PR:** — (generic improvement, could upstream)
+
+### `pyproject.toml`
+- **What:** Added `[project.entry-points."nanobot.channels"]` registering `KeplerSlackChannel`
+- **Why:** Channel override mechanism — replaces built-in Slack with Kepler's extended version
 - **PR:** —

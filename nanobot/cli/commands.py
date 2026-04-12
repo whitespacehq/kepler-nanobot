@@ -478,6 +478,17 @@ def _make_provider(config: Config):
     return provider
 
 
+def _register_kepler_tools(agent_loop: Any) -> None:
+    """Register Kepler-specific tools on an AgentLoop instance."""
+    # KEPLER: auto-discover and register tools from nanobot.kepler.tools
+    if not hasattr(agent_loop, "bus") or not hasattr(agent_loop, "tools"):
+        return
+    from nanobot.kepler.tools.loader import load_kepler_tools
+
+    for tool in load_kepler_tools(bus=agent_loop.bus):
+        agent_loop.tools.register(tool)
+
+
 def _load_runtime_config(config: str | None = None, workspace: str | None = None) -> Config:
     """Load config and optionally override the active workspace."""
     from nanobot.config.loader import load_config, resolve_config_env_vars, set_config_path
@@ -602,6 +613,7 @@ def serve(
         disabled_skills=runtime_config.agents.defaults.disabled_skills,
         session_ttl_minutes=runtime_config.agents.defaults.session_ttl_minutes,
     )
+    _register_kepler_tools(agent_loop)
 
     model_name = runtime_config.agents.defaults.model
     console.print(f"{__logo__} Starting OpenAI-compatible API server")
@@ -696,6 +708,7 @@ def gateway(
         disabled_skills=config.agents.defaults.disabled_skills,
         session_ttl_minutes=config.agents.defaults.session_ttl_minutes,
     )
+    _register_kepler_tools(agent)
 
     # Set cron callback (needs agent)
     async def on_cron_job(job: CronJob) -> str | None:
@@ -930,6 +943,7 @@ def agent(
         disabled_skills=config.agents.defaults.disabled_skills,
         session_ttl_minutes=config.agents.defaults.session_ttl_minutes,
     )
+    _register_kepler_tools(agent_loop)
     restart_notice = consume_restart_notice_from_env()
     if restart_notice and should_show_cli_restart_notice(restart_notice, session_id):
         _print_agent_response(

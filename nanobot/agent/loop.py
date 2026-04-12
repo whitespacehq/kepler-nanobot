@@ -305,10 +305,14 @@ class AgentLoop:
 
     def _set_tool_context(self, channel: str, chat_id: str, message_id: str | None = None) -> None:
         """Update context for all tools that need routing info."""
-        for name in ("message", "spawn", "cron"):
-            if tool := self.tools.get(name):
-                if hasattr(tool, "set_context"):
-                    tool.set_context(channel, chat_id, *([message_id] if name == "message" else []))
+        # KEPLER: iterate all registered tools with set_context instead of a
+        # fixed list, so Kepler tools get context without further changes here.
+        for name, tool in self.tools.all_tools():
+            if hasattr(tool, "set_context"):
+                if name == "message":
+                    tool.set_context(channel, chat_id, message_id)
+                else:
+                    tool.set_context(channel, chat_id)
 
     @staticmethod
     def _strip_think(text: str | None) -> str | None:
