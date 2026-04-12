@@ -28,9 +28,15 @@ class AnthropicProvider(LLMProvider):
     prompt caching, extended thinking, tool calls, and streaming.
     """
 
+    # KEPLER: OAuth headers mirroring OpenClaw's anthropic-transport-stream.ts.
+    # Required for Anthropic API to accept OAuth tokens (sk-ant-oat-*).
+    _OAUTH_BETA = "claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14,interleaved-thinking-2025-05-14"
+    _OAUTH_USER_AGENT = "claude-cli/2.1.75"
+
     def __init__(
         self,
         api_key: str | None = None,
+        auth_token: str | None = None,
         api_base: str | None = None,
         default_model: str = "claude-sonnet-4-20250514",
         extra_headers: dict[str, str] | None = None,
@@ -41,13 +47,30 @@ class AnthropicProvider(LLMProvider):
 
         from anthropic import AsyncAnthropic
 
+        # KEPLER: resolve OAuth token from param or ANTHROPIC_AUTH_TOKEN env var.
+        if auth_token is None:
+            auth_token = os.environ.get("ANTHROPIC_AUTH_TOKEN")
+        is_oauth = bool(auth_token)
+        self._is_oauth = is_oauth
+
         client_kw: dict[str, Any] = {}
-        if api_key:
+        if is_oauth:
+            client_kw["auth_token"] = auth_token
+        elif api_key:
             client_kw["api_key"] = api_key
         if api_base:
             client_kw["base_url"] = api_base
-        if extra_headers:
-            client_kw["default_headers"] = extra_headers
+
+        # KEPLER: merge OAuth-required headers with any user-supplied extras.
+        headers = dict(extra_headers or {})
+        if is_oauth:
+            headers.setdefault("anthropic-beta", self._OAUTH_BETA)
+            headers.setdefault("user-agent", self._OAUTH_USER_AGENT)
+            headers.setdefault("x-app", "cli")
+            headers.setdefault("anthropic-dangerous-direct-browser-access", "true")
+        if headers:
+            client_kw["default_headers"] = headers
+
         # Keep retries centralized in LLMProvider._run_with_retry to avoid retry amplification.
         client_kw["max_retries"] = 0
         self._client = AsyncAnthropic(**client_kw)
@@ -377,6 +400,13 @@ class AnthropicProvider(LLMProvider):
             "max_tokens": max_tokens,
         }
 
+        # KEPLER: OAuth requires Claude Code identity prefix in system prompt.
+        if system and self._is_oauth:
+            prefix = {"type": "text", "text": "You are Claude Code, Anthropic's official CLI for Claude."}
+            if isinstance(system, str):
+                system = [prefix, {"type": "text", "text": system}]
+            elif isinstance(system, list):
+                system = [prefix] + system
         if system:
             kwargs["system"] = system
 

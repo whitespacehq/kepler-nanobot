@@ -453,6 +453,7 @@ def _make_provider(config: Config):
 
         provider = AnthropicProvider(
             api_key=p.api_key if p else None,
+            auth_token=None,  # KEPLER: resolved from ANTHROPIC_AUTH_TOKEN env var
             api_base=config.get_api_base(model),
             default_model=model,
             extra_headers=p.extra_headers if p else None,
@@ -489,6 +490,13 @@ def _load_runtime_config(config: str | None = None, workspace: str | None = None
             raise typer.Exit(1)
         set_config_path(config_path)
         console.print(f"[dim]Using config: {config_path}[/dim]")
+
+    # KEPLER: load .env file next to config (or cwd) so ${VAR} references resolve.
+    from dotenv import load_dotenv
+    dotenv_dir = config_path.parent if config_path else Path.cwd()
+    dotenv_path = dotenv_dir / ".env"
+    if dotenv_path.exists():
+        load_dotenv(dotenv_path, override=False)
 
     try:
         loaded = resolve_config_env_vars(load_config(config_path))

@@ -184,13 +184,14 @@ PROVIDERS: tuple[ProviderSpec, ...] = (
 
 
     # === Standard providers (matched by model-name keywords) ===============
-    # Anthropic: native Anthropic SDK
+    # Anthropic: native Anthropic SDK (supports OAuth via ANTHROPIC_AUTH_TOKEN)
     ProviderSpec(
         name="anthropic",
         keywords=("anthropic", "claude"),
-        env_key="ANTHROPIC_API_KEY",
+        env_key="ANTHROPIC_AUTH_TOKEN",  # KEPLER: OAuth token (used for validation/matching only)
         display_name="Anthropic",
         backend="anthropic",
+        is_oauth=True,  # KEPLER: skip API key validation when using OAuth
         supports_prompt_caching=True,
     ),
     # OpenAI: SDK default base URL (no override needed)

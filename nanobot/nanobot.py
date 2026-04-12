@@ -155,6 +155,7 @@ def _make_provider(config: Any) -> Any:
 
         provider = AnthropicProvider(
             api_key=p.api_key if p else None,
+            auth_token=None,  # KEPLER: resolved from ANTHROPIC_AUTH_TOKEN env var
             api_base=config.get_api_base(model),
             default_model=model,
             extra_headers=p.extra_headers if p else None,
