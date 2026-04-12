@@ -4,6 +4,8 @@
 .docs
 .env
 .web
+workspace/
+config.json
 
 # Python bytecode & caches
 *.pyc
