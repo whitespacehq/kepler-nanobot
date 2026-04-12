@@ -6,6 +6,7 @@
 .web
 workspace/
 config.json
+logs/
 
 # Python bytecode & caches
 *.pyc
