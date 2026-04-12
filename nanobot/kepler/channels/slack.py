@@ -29,6 +29,19 @@ class KeplerSlackChannel(SlackChannel):
 
     display_name = "Slack (Kepler)"
 
+    async def _handle_message(self, sender_id, chat_id, content, media=None,
+                               metadata=None, session_key=None):
+        """Inject Slack message ts as message_id for tool context routing."""
+        meta = metadata or {}
+        slack_event = meta.get("slack", {}).get("event", {})
+        ts = slack_event.get("ts", "")
+        if ts:
+            meta["message_id"] = ts
+        await super()._handle_message(
+            sender_id=sender_id, chat_id=chat_id, content=content,
+            media=media, metadata=meta, session_key=session_key,
+        )
+
     def __init__(self, config: Any, bus: Any) -> None:
         super().__init__(config, bus)
         # ts → thread_ts cache for routing reaction events back to the

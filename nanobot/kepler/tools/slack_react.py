@@ -52,13 +52,17 @@ def _normalize_emoji(emoji: str) -> str:
 @tool_parameters(
     tool_parameters_schema(
         emoji=StringSchema("Emoji shortcode name, e.g. 'thumbsup', 'heart', 'eyes'"),
-        message_ts=StringSchema("Timestamp of the Slack message to react to"),
+        message_ts=StringSchema(
+            "Timestamp of the Slack message to react to. "
+            "Omit to react to the message you are currently responding to.",
+            nullable=True,
+        ),
         action=StringSchema(
             "Action to perform",
             enum=["add", "remove"],
         ),
         channel=StringSchema("Target channel ID (defaults to current conversation)"),
-        required=["emoji", "message_ts"],
+        required=["emoji"],
     )
 )
 class SlackReactTool(Tool):
@@ -71,11 +75,14 @@ class SlackReactTool(Tool):
         self._send_callback = send_callback
         self._channel: str = ""
         self._chat_id: str = ""
+        self._last_message_ts: str = ""
 
-    def set_context(self, channel: str, chat_id: str) -> None:
+    def set_context(self, channel: str, chat_id: str, message_id: str | None = None) -> None:
         """Set the current conversation context for routing."""
         self._channel = channel
         self._chat_id = chat_id
+        if message_id:
+            self._last_message_ts = message_id
 
     @property
     def name(self) -> str:
@@ -91,13 +98,17 @@ class SlackReactTool(Tool):
     async def execute(
         self,
         emoji: str,
-        message_ts: str,
+        message_ts: str | None = None,
         action: str = "add",
         channel: str | None = None,
         **kwargs: Any,
     ) -> str:
         if not self._send_callback:
             return "Error: Message sending not configured"
+
+        message_ts = message_ts or self._last_message_ts
+        if not message_ts:
+            return "Error: No message timestamp specified and no current message context"
 
         chat_id = channel or self._chat_id
         if not chat_id:

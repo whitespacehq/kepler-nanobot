@@ -307,9 +307,12 @@ class AgentLoop:
         """Update context for all tools that need routing info."""
         # KEPLER: iterate all registered tools with set_context instead of a
         # fixed list, so Kepler tools get context without further changes here.
-        for name, tool in self.tools.all_tools():
+        # Pass message_id to tools whose set_context accepts it (3+ params).
+        import inspect
+        for _name, tool in self.tools.all_tools():
             if hasattr(tool, "set_context"):
-                if name == "message":
+                sig = inspect.signature(tool.set_context)
+                if len(sig.parameters) >= 3:  # self excluded by bound method
                     tool.set_context(channel, chat_id, message_id)
                 else:
                     tool.set_context(channel, chat_id)
