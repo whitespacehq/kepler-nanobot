@@ -1,4 +1,4 @@
-"""Kepler's Slack channel — extends upstream with reaction handling."""
+"""Kepler's Slack channel — extends upstream with inbound reaction handling."""
 
 from __future__ import annotations
 
@@ -10,21 +10,20 @@ from slack_sdk.socket_mode.request import SocketModeRequest
 from slack_sdk.socket_mode.response import SocketModeResponse
 from slack_sdk.socket_mode.websockets import SocketModeClient
 
-from nanobot.bus.events import OutboundMessage
 from nanobot.channels.slack import SlackChannel
 
 _MAX_TS_CACHE = 1000
 
 
 class KeplerSlackChannel(SlackChannel):
-    """Slack channel with reaction send/receive support.
-
-    Outbound: intercepts ``_reaction`` metadata to call ``reactions_add`` /
-    ``reactions_remove`` instead of posting a message.
+    """Slack channel with inbound reaction event support.
 
     Inbound: optionally delivers ``reaction_added`` / ``reaction_removed``
     events to the agent (controlled by ``reaction_events`` config key,
     default ``"off"``).
+
+    Outbound reactions are handled by the Slack MCP server
+    (``reactions_add`` / ``reactions_remove`` tools).
     """
 
     display_name = "Slack (Kepler)"
@@ -51,41 +50,6 @@ class KeplerSlackChannel(SlackChannel):
         # Pydantic model doesn't know about this field.
         raw = config if isinstance(config, dict) else config.model_dump(by_alias=True)
         self._reaction_events: str = raw.get("reactionEvents", "off")
-
-    # ------------------------------------------------------------------
-    # Outbound — intercept _reaction metadata
-    # ------------------------------------------------------------------
-
-    async def send(self, msg: OutboundMessage) -> None:
-        """Send a message or reaction through Slack."""
-        if msg.metadata and msg.metadata.get("_reaction"):
-            await self._send_reaction(msg)
-            return
-        await super().send(msg)
-
-    async def _send_reaction(self, msg: OutboundMessage) -> None:
-        """Execute a reaction add/remove via the Slack Web API."""
-        if not self._web_client:
-            logger.warning("Slack client not running, cannot send reaction")
-            return
-        r = msg.metadata["_reaction"]
-        emoji = r["emoji"]
-        message_ts = r["message_ts"]
-        action = r.get("action", "add")
-        channel = msg.chat_id
-
-        try:
-            if action == "remove":
-                await self._web_client.reactions_remove(
-                    channel=channel, name=emoji, timestamp=message_ts,
-                )
-            else:
-                await self._web_client.reactions_add(
-                    channel=channel, name=emoji, timestamp=message_ts,
-                )
-            logger.debug("Slack reaction {}: :{}: on {} in {}", action, emoji, message_ts, channel)
-        except Exception as e:
-            logger.warning("Slack reaction {} failed: {}", action, e)
 
     # ------------------------------------------------------------------
     # Inbound — intercept reaction events, cache ts→thread

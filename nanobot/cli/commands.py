@@ -708,6 +708,11 @@ def gateway(
         disabled_skills=config.agents.defaults.disabled_skills,
         session_ttl_minutes=config.agents.defaults.session_ttl_minutes,
     )
+    # KEPLER: monitoring hook
+    from nanobot.kepler.monitoring.hook import MonitoringHook
+    monitor_hook = MonitoringHook(config.workspace_path / "monitor.db")
+    agent._extra_hooks.append(monitor_hook)
+
     _register_kepler_tools(agent)
 
     # Set cron callback (needs agent)
@@ -771,26 +776,11 @@ def gateway(
     # Create channel manager
     channels = ChannelManager(config, bus)
 
-    def _pick_heartbeat_target() -> tuple[str, str]:
-        """Pick a routable channel/chat target for heartbeat-triggered messages."""
-        enabled = set(channels.enabled_channels)
-        # Prefer the most recently updated non-internal session on an enabled channel.
-        for item in session_manager.list_sessions():
-            key = item.get("key") or ""
-            if ":" not in key:
-                continue
-            channel, chat_id = key.split(":", 1)
-            if channel in {"cli", "system"}:
-                continue
-            if channel in enabled and chat_id:
-                return channel, chat_id
-        # Fallback keeps prior behavior but remains explicit.
-        return "cli", "direct"
-
-    # Create heartbeat service
+    # KEPLER: Heartbeat agent routes its own messages via MCP slack tools
+    # (conversations_add_message with thread_ts targeting).  No infrastructure-
+    # level delivery target is needed — the agent decides where to reply.
     async def on_heartbeat_execute(tasks: str) -> str:
         """Phase 2: execute heartbeat tasks through the full agent loop."""
-        channel, chat_id = _pick_heartbeat_target()
 
         async def _silent(*_args, **_kwargs):
             pass
@@ -798,8 +788,8 @@ def gateway(
         resp = await agent.process_direct(
             tasks,
             session_key="heartbeat",
-            channel=channel,
-            chat_id=chat_id,
+            channel="heartbeat",
+            chat_id="internal",
             on_progress=_silent,
         )
 
@@ -812,12 +802,8 @@ def gateway(
         return resp.content if resp else ""
 
     async def on_heartbeat_notify(response: str) -> None:
-        """Deliver a heartbeat response to the user's channel."""
-        from nanobot.bus.events import OutboundMessage
-        channel, chat_id = _pick_heartbeat_target()
-        if channel == "cli":
-            return  # No external channel available to deliver to
-        await bus.publish_outbound(OutboundMessage(channel=channel, chat_id=chat_id, content=response))
+        """No-op: heartbeat agent delivers messages directly via MCP slack tools."""
+        logger.info("Heartbeat: response generated (delivery handled by agent via MCP)")
 
     hb_cfg = config.gateway.heartbeat
     heartbeat = HeartbeatService(

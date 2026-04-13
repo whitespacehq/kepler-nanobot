@@ -361,6 +361,10 @@ class AgentLoop:
 
         Returns (final_content, tools_used, messages, stop_reason, had_injections).
         """
+        from nanobot.kepler.monitoring.context import model_var, session_key_var  # KEPLER: monitoring
+        session_key_var.set(session.key if session else "unknown")  # KEPLER: monitoring
+        model_var.set(self.model)  # KEPLER: monitoring
+
         loop_hook = _LoopHook(
             self,
             on_progress=on_progress,

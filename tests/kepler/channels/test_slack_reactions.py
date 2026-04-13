@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nanobot.bus.events import OutboundMessage
 from nanobot.kepler.channels.slack import KeplerSlackChannel
 
 
@@ -30,58 +29,6 @@ def _make_channel(reaction_events="off", **extra_config):
     channel._web_client = AsyncMock()
     channel._bot_user_id = "U_BOT"
     return channel
-
-
-# -- Outbound reactions ------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_send_reaction_add():
-    channel = _make_channel()
-    msg = OutboundMessage(
-        channel="slack",
-        chat_id="C12345",
-        content="",
-        metadata={"_reaction": {"emoji": "thumbsup", "message_ts": "1.0", "action": "add"}},
-    )
-    await channel.send(msg)
-
-    channel._web_client.reactions_add.assert_called_once_with(
-        channel="C12345", name="thumbsup", timestamp="1.0",
-    )
-    channel._web_client.chat_postMessage.assert_not_called()
-
-
-@pytest.mark.asyncio
-async def test_send_reaction_remove():
-    channel = _make_channel()
-    msg = OutboundMessage(
-        channel="slack",
-        chat_id="C12345",
-        content="",
-        metadata={"_reaction": {"emoji": "heart", "message_ts": "2.0", "action": "remove"}},
-    )
-    await channel.send(msg)
-
-    channel._web_client.reactions_remove.assert_called_once_with(
-        channel="C12345", name="heart", timestamp="2.0",
-    )
-
-
-@pytest.mark.asyncio
-async def test_send_regular_message_still_works():
-    """Non-reaction messages delegate to base class send()."""
-    channel = _make_channel()
-    msg = OutboundMessage(
-        channel="slack",
-        chat_id="C12345",
-        content="hello",
-        metadata={"slack": {"channel_type": "channel"}},
-    )
-    await channel.send(msg)
-
-    channel._web_client.chat_postMessage.assert_called_once()
-    channel._web_client.reactions_add.assert_not_called()
 
 
 # -- ts→thread cache --------------------------------------------------------
