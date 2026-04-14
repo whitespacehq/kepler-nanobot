@@ -57,7 +57,7 @@ def discover_all() -> dict[str, type[BaseChannel]]:
     External plugins take priority so forks can override built-in channels
     without modifying upstream source files.
     """
-    # KEPLER: flipped priority so entry_points override built-ins.
+    # COBBLE: flipped priority so entry_points override built-ins.
     builtin: dict[str, type[BaseChannel]] = {}
     for modname in discover_channel_names():
         try:

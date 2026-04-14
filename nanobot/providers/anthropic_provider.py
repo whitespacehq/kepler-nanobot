@@ -28,7 +28,7 @@ class AnthropicProvider(LLMProvider):
     prompt caching, extended thinking, tool calls, and streaming.
     """
 
-    # KEPLER: OAuth headers mirroring OpenClaw's anthropic-transport-stream.ts.
+    # COBBLE: OAuth headers mirroring OpenClaw's anthropic-transport-stream.ts.
     # Required for Anthropic API to accept OAuth tokens (sk-ant-oat-*).
     _OAUTH_BETA = "claude-code-20250219,oauth-2025-04-20,fine-grained-tool-streaming-2025-05-14,interleaved-thinking-2025-05-14"
     _OAUTH_USER_AGENT = "claude-cli/2.1.75"
@@ -47,7 +47,7 @@ class AnthropicProvider(LLMProvider):
 
         from anthropic import AsyncAnthropic
 
-        # KEPLER: resolve OAuth token from param or ANTHROPIC_AUTH_TOKEN env var.
+        # COBBLE: resolve OAuth token from param or ANTHROPIC_AUTH_TOKEN env var.
         if auth_token is None:
             auth_token = os.environ.get("ANTHROPIC_AUTH_TOKEN")
         is_oauth = bool(auth_token)
@@ -61,7 +61,7 @@ class AnthropicProvider(LLMProvider):
         if api_base:
             client_kw["base_url"] = api_base
 
-        # KEPLER: merge OAuth-required headers with any user-supplied extras.
+        # COBBLE: merge OAuth-required headers with any user-supplied extras.
         headers = dict(extra_headers or {})
         if is_oauth:
             headers.setdefault("anthropic-beta", self._OAUTH_BETA)
@@ -400,7 +400,7 @@ class AnthropicProvider(LLMProvider):
             "max_tokens": max_tokens,
         }
 
-        # KEPLER: OAuth requires Claude Code identity prefix in system prompt.
+        # COBBLE: OAuth requires Claude Code identity prefix in system prompt.
         if system and self._is_oauth:
             prefix = {"type": "text", "text": "You are Claude Code, Anthropic's official CLI for Claude."}
             if isinstance(system, str):

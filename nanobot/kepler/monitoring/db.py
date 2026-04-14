@@ -54,7 +54,7 @@ CREATE INDEX IF NOT EXISTS idx_tool_calls_name ON tool_calls(tool_name);
 CREATE INDEX IF NOT EXISTS idx_tool_calls_created ON tool_calls(created_at);
 """
 
-# KEPLER: Migrations for existing databases that were created before
+# COBBLE: Migrations for existing databases that were created before
 # content capture was added.
 _MIGRATIONS = [
     ("iterations", "user_content", "ALTER TABLE iterations ADD COLUMN user_content TEXT"),

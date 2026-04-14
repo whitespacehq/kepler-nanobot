@@ -453,7 +453,7 @@ def _make_provider(config: Config):
 
         provider = AnthropicProvider(
             api_key=p.api_key if p else None,
-            auth_token=None,  # KEPLER: resolved from ANTHROPIC_AUTH_TOKEN env var
+            auth_token=None,  # COBBLE: resolved from ANTHROPIC_AUTH_TOKEN env var
             api_base=config.get_api_base(model),
             default_model=model,
             extra_headers=p.extra_headers if p else None,
@@ -480,7 +480,7 @@ def _make_provider(config: Config):
 
 def _register_kepler_tools(agent_loop: Any) -> None:
     """Register Kepler-specific tools on an AgentLoop instance."""
-    # KEPLER: auto-discover and register tools from nanobot.kepler.tools
+    # COBBLE: auto-discover and register tools from nanobot.kepler.tools
     if not hasattr(agent_loop, "bus") or not hasattr(agent_loop, "tools"):
         return
     from nanobot.kepler.tools.loader import load_kepler_tools
@@ -502,7 +502,7 @@ def _load_runtime_config(config: str | None = None, workspace: str | None = None
         set_config_path(config_path)
         console.print(f"[dim]Using config: {config_path}[/dim]")
 
-    # KEPLER: load .env file next to config (or cwd) so ${VAR} references resolve.
+    # COBBLE: load .env file next to config (or cwd) so ${VAR} references resolve.
     from dotenv import load_dotenv
     dotenv_dir = config_path.parent if config_path else Path.cwd()
     dotenv_path = dotenv_dir / ".env"
@@ -708,7 +708,7 @@ def gateway(
         disabled_skills=config.agents.defaults.disabled_skills,
         session_ttl_minutes=config.agents.defaults.session_ttl_minutes,
     )
-    # KEPLER: monitoring hook
+    # COBBLE: monitoring hook
     from nanobot.kepler.monitoring.hook import MonitoringHook
     monitor_hook = MonitoringHook(config.workspace_path / "monitor.db")
     agent._extra_hooks.append(monitor_hook)
@@ -776,7 +776,7 @@ def gateway(
     # Create channel manager
     channels = ChannelManager(config, bus)
 
-    # KEPLER: Heartbeat agent routes its own messages via MCP slack tools
+    # COBBLE: Heartbeat agent routes its own messages via MCP slack tools
     # (conversations_add_message with thread_ts targeting).  No infrastructure-
     # level delivery target is needed — the agent decides where to reply.
     async def on_heartbeat_execute(tasks: str) -> str:

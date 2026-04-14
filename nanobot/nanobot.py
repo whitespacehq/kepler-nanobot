@@ -86,7 +86,7 @@ class Nanobot:
             session_ttl_minutes=defaults.session_ttl_minutes,
         )
 
-        # KEPLER: register Kepler-specific tools
+        # COBBLE: register Cobble-specific tools
         from nanobot.kepler.tools.loader import load_kepler_tools
 
         for tool in load_kepler_tools(bus=bus):
@@ -162,7 +162,7 @@ def _make_provider(config: Any) -> Any:
 
         provider = AnthropicProvider(
             api_key=p.api_key if p else None,
-            auth_token=None,  # KEPLER: resolved from ANTHROPIC_AUTH_TOKEN env var
+            auth_token=None,  # COBBLE: resolved from ANTHROPIC_AUTH_TOKEN env var
             api_base=config.get_api_base(model),
             default_model=model,
             extra_headers=p.extra_headers if p else None,

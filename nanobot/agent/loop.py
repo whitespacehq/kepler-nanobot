@@ -305,7 +305,7 @@ class AgentLoop:
 
     def _set_tool_context(self, channel: str, chat_id: str, message_id: str | None = None) -> None:
         """Update context for all tools that need routing info."""
-        # KEPLER: iterate all registered tools with set_context instead of a
+        # COBBLE: iterate all registered tools with set_context instead of a
         # fixed list, so Kepler tools get context without further changes here.
         # Pass message_id to tools whose set_context accepts it (3+ params).
         import inspect
@@ -361,9 +361,9 @@ class AgentLoop:
 
         Returns (final_content, tools_used, messages, stop_reason, had_injections).
         """
-        from nanobot.kepler.monitoring.context import model_var, session_key_var  # KEPLER: monitoring
-        session_key_var.set(session.key if session else "unknown")  # KEPLER: monitoring
-        model_var.set(self.model)  # KEPLER: monitoring
+        from nanobot.kepler.monitoring.context import model_var, session_key_var  # COBBLE: monitoring
+        session_key_var.set(session.key if session else "unknown")  # COBBLE: monitoring
+        model_var.set(self.model)  # COBBLE: monitoring
 
         loop_hook = _LoopHook(
             self,
