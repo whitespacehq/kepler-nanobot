@@ -152,7 +152,7 @@ def test_discover_all_includes_external_plugin():
 
 
 def test_discover_all_plugin_overrides_builtin():
-    """Plugins take priority over built-ins (KEPLER: flipped from upstream)."""
+    """Plugins take priority over built-ins (COBBLE: flipped from upstream)."""
     from nanobot.channels.registry import discover_all
 
     ep = _make_entry_point("telegram", _FakeTelegram)
