@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import json
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from pathlib import Path
-
-from loguru import logger
 
 from nanobot.agent.hook import AgentHook, AgentHookContext
 from nanobot.kepler.monitoring.context import model_var, session_key_var
@@ -42,14 +42,26 @@ def _extract_user_content(messages: list[dict]) -> str | None:
     return None
 
 
+@dataclass
+class _PendingIteration:
+    iteration_id: int
+    tool_call_ids: list[tuple[int, str]] = field(default_factory=list)
+
+
 class MonitoringHook(AgentHook):
     """Writes structured monitoring events to SQLite."""
 
     def __init__(self, db_path: Path) -> None:
         super().__init__(reraise=False)
         self._conn = init_db(db_path)
-        self._pending_iteration_id: int | None = None
-        self._pending_tool_call_ids: list[tuple[int, str]] = []  # (db_id, api_tool_call_id)
+        self._pending: ContextVar[_PendingIteration | None] = ContextVar(
+            "monitor_pending_iteration",
+            default=None,
+        )
+
+    async def before_iteration(self, context: AgentHookContext) -> None:
+        # New runs may inherit a parent task's context; start with their own state.
+        self._pending.set(None)
 
     async def before_execute_tools(self, context: AgentHookContext) -> None:
         session_key = session_key_var.get()
@@ -76,8 +88,8 @@ class MonitoringHook(AgentHook):
             user_content=user_content,
             assistant_content=assistant_content,
         )
-        self._pending_iteration_id = iteration_id
-        self._pending_tool_call_ids = []
+        pending = _PendingIteration(iteration_id)
+        self._pending.set(pending)
 
         for tc in context.tool_calls:
             args_str = json.dumps(tc.arguments)[:500] if tc.arguments else None
@@ -89,12 +101,13 @@ class MonitoringHook(AgentHook):
                 tool_name=tc.name,
                 arguments=args_str,
             )
-            self._pending_tool_call_ids.append((db_id, tc.id))
+            pending.tool_call_ids.append((db_id, tc.id))
 
     async def after_iteration(self, context: AgentHookContext) -> None:
+        pending = self._pending.get()
         # Record iterations that don't have tool calls (final response only).
         # before_execute_tools won't fire for these.
-        if self._pending_iteration_id is None and context.usage:
+        if pending is None and context.usage:
             session_key = session_key_var.get()
             model = model_var.get()
             usage = context.usage
@@ -117,20 +130,20 @@ class MonitoringHook(AgentHook):
                 user_content=user_content,
                 assistant_content=assistant_content,
             )
-            self._pending_iteration_id = iteration_id
+            pending = _PendingIteration(iteration_id)
 
-        if self._pending_iteration_id is not None and context.stop_reason:
+        if pending is not None and context.stop_reason:
             await asyncio.to_thread(
                 update_iteration_final,
                 self._conn,
-                iteration_id=self._pending_iteration_id,
+                iteration_id=pending.iteration_id,
                 stop_reason=context.stop_reason,
                 error=context.error,
             )
 
         # Capture tool results — match via messages appended during execution.
         # After tools run, context.messages has {"role":"tool", "tool_call_id":..., "content":...}
-        if self._pending_tool_call_ids:
+        if pending is not None and pending.tool_call_ids:
             # Build a map of api_tool_call_id -> result content from messages
             result_map: dict[str, str] = {}
             for msg in reversed(context.messages):
@@ -139,7 +152,7 @@ class MonitoringHook(AgentHook):
                 elif msg.get("role") != "tool":
                     break  # Stop when we hit non-tool messages
 
-            for db_id, api_id in self._pending_tool_call_ids:
+            for db_id, api_id in pending.tool_call_ids:
                 result = result_map.get(api_id)
                 if result is not None:
                     await asyncio.to_thread(
@@ -149,5 +162,4 @@ class MonitoringHook(AgentHook):
                         result=_truncate(result, _MAX_RESULT_LEN),
                     )
 
-        self._pending_iteration_id = None
-        self._pending_tool_call_ids = []
+        self._pending.set(None)
